@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#2E7D8C">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>케어브릿지 — 암 요양병원 찾기</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=608484a4f5536ddf83031123c853b135"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:#F0F4F8;color:#1A2B3C;overflow:hidden}
+    #app{display:flex;flex-direction:column;height:100vh;max-width:480px;margin:0 auto;background:#F5F5F0;position:relative;overflow:hidden;box-shadow:0 0 40px rgba(0,0,0,.15)}
+
+    /* ── HEADER ── */
+    .hdr{background:#2E7D8C;color:#fff;padding:14px 20px;display:flex;align-items:center;gap:10px;flex-shrink:0;min-height:58px}
+    .hdr-back{background:none;border:none;color:#fff;font-size:26px;cursor:pointer;line-height:1;padding:0 4px 0 0}
+    .hdr-title{font-size:18px;font-weight:700;line-height:1.2}
+    .hdr-sub{font-size:12px;opacity:.8;margin-top:1px}
+    .hdr-fav-btn{margin-left:auto;background:none;border:none;color:#fff;font-size:22px;cursor:pointer}
+
+    /* ── VIEWS ── */
+    .view{flex:1;overflow-y:auto;display:none;flex-direction:column;-webkit-overflow-scrolling:touch}
+    .view.active{display:flex}
+
+    /* HOME */
+    #vh{padding:20px 16px 24px;gap:12px;background:#F5F5F0}
+    .logo-box{text-align:center;padding:8px 0 4px}
+    .logo-circle{width:72px;height:72px;background:#2E7D8C;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;font-size:38px;margin-bottom:10px}
+    .home-h{font-size:21px;font-weight:700;line-height:1.4;text-align:center}
+    .home-p{font-size:13px;color:#666;text-align:center;line-height:1.7;margin-top:6px}
+    .sec-label{font-size:12px;font-weight:700;color:#2E7D8C;letter-spacing:.5px;margin-top:4px}
+    .uni-btn{background:#fff;border:2px solid #E5E5E5;border-radius:16px;padding:16px 18px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:all .15s;width:100%}
+    .uni-btn:active{background:#EAF5F7;border-color:#2E7D8C;transform:scale(.99)}
+    .uni-icon{width:46px;height:46px;background:#EAF5F7;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+    .uni-info h3{font-size:15px;font-weight:700}
+    .uni-info p{font-size:12px;color:#888;margin-top:2px}
+    .uni-arrow{margin-left:auto;color:#2E7D8C;font-size:18px}
+
+    /* FILTER BAR */
+    .filter-wrap{background:#fff;border-bottom:1px solid #EDEDED;flex-shrink:0}
+    .filter-bar{padding:10px 14px;display:flex;gap:7px;overflow-x:auto;white-space:nowrap}
+    .filter-bar::-webkit-scrollbar{display:none}
+    .fbtn{padding:7px 13px;border-radius:20px;border:1.5px solid #DDD;background:#fff;font-size:13px;font-weight:500;color:#666;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s}
+    .fbtn.on{background:#2E7D8C;border-color:#2E7D8C;color:#fff}
+    .sort-row{padding:6px 14px 8px;display:flex;gap:6px;align-items:center;border-top:1px solid #F5F5F5}
+    .sort-lbl{font-size:11px;color:#AAA}
+    .sbtn{padding:3px 10px;border-radius:12px;border:1px solid #DDD;background:#fff;font-size:12px;color:#777;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+    .sbtn.on{background:#2E7D8C;border-color:#2E7D8C;color:#fff}
+    .result-lbl{padding:6px 16px 4px;font-size:12px;color:#AAA;flex-shrink:0}
+    .result-lbl strong{color:#2E7D8C}
+
+    /* HOSPITAL CARDS */
+    .card-list{flex:1;overflow-y:auto;padding:10px 12px 16px;display:flex;flex-direction:column;gap:9px;-webkit-overflow-scrolling:touch}
+    .card{background:#fff;border-radius:16px;padding:15px 15px 13px;border:1px solid #EEEEEE;cursor:pointer;transition:all .15s;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+    .card:active{transform:scale(.99);box-shadow:0 2px 8px rgba(0,0,0,.1)}
+    .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:5px}
+    .card-name{font-size:15px;font-weight:700}
+    .card-km{font-size:11px;color:#2E7D8C;font-weight:700;background:#EAF5F7;padding:3px 8px;border-radius:10px;flex-shrink:0;margin-left:8px}
+    .card-addr{font-size:12px;color:#999;margin-bottom:9px}
+    .badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px}
+    .badge{padding:3px 7px;border-radius:8px;font-size:11px;font-weight:600}
+    .b-ins{background:#E3F2FD;color:#1565C0}
+    .b-prv{background:#F3E5F5;color:#6A1B9A}
+    .b-chm{background:#E8F5E9;color:#2E7D32}
+    .b-rad{background:#FFF3E0;color:#E65100}
+    .card-bottom{display:flex;justify-content:space-between;align-items:center}
+    .card-price{font-size:12px;color:#AAA}
+    .card-price span{color:#E8654B;font-weight:700}
+    .card-heart{background:none;border:none;font-size:20px;cursor:pointer;padding:2px}
+
+    /* MAP */
+    #view-map{position:relative}
+    #kmap{width:100%;flex:1;min-height:200px}
+    .map-panel{position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:20px 20px 0 0;padding:16px;box-shadow:0 -4px 24px rgba(0,0,0,.15);transform:translateY(100%);transition:transform .28s ease;z-index:10}
+    .map-panel.show{transform:translateY(0)}
+    .panel-handle{width:36px;height:4px;background:#DDD;border-radius:2px;margin:0 auto 12px}
+    .panel-name{font-size:16px;font-weight:700;margin-bottom:3px}
+    .panel-addr{font-size:13px;color:#888;margin-bottom:10px}
+    .panel-btns{display:flex;gap:9px;margin-top:10px}
+    .pbtn-detail{flex:1;padding:12px;background:#2E7D8C;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+    .pbtn-call{padding:12px 18px;background:#E8654B;color:#fff;border:none;border-radius:12px;font-size:14px;cursor:pointer;font-family:'Noto Sans KR',sans-serif}
+
+    /* DETAIL */
+    #view-detail{overflow-y:auto}
+    .det-img{height:210px;background:linear-gradient(135deg,#2E7D8C,#1a5c6b);display:flex;align-items:center;justify-content:center;font-size:64px;flex-shrink:0}
+    .det-body{padding:18px 18px 100px}
+    .det-name{font-size:22px;font-weight:700;margin-bottom:4px}
+    .det-addr{font-size:13px;color:#888;margin-bottom:14px;display:flex;align-items:center;gap:4px}
+    .det-badges{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:18px}
+    .det-sec{margin-bottom:18px}
+    .det-sec-t{font-size:13px;font-weight:700;color:#2E7D8C;padding-bottom:8px;border-bottom:1px solid #EEE;margin-bottom:10px}
+    .det-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F5F5F5;font-size:14px}
+    .det-row-l{color:#888}
+    .det-row-v{font-weight:600}
+    .det-features{font-size:14px;color:#555;line-height:1.8}
+    .disclaimer{background:#FFF8E1;border-radius:12px;padding:12px 14px;font-size:12px;color:#999;line-height:1.6}
+    .fixed-btns{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:12px 16px 16px;background:#fff;border-top:1px solid #EEE;display:flex;gap:9px;z-index:99}
+    .btn-call-big{flex:1;padding:15px;background:#E8654B;color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px}
+    .btn-heart-big{padding:15px 18px;background:#F5F5F0;border:none;border-radius:14px;font-size:22px;cursor:pointer}
+
+    /* FAVORITES */
+    #view-fav{padding:12px;gap:9px;background:#F5F5F0}
+    .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:#CCC;text-align:center;padding:40px}
+    .empty .ei{font-size:48px}
+    .empty p{font-size:14px}
+
+    /* BOTTOM NAV */
+    .bnav{background:#fff;border-top:1px solid #EDEDED;display:flex;flex-shrink:0;safe-area-inset-bottom:env(safe-area-inset-bottom)}
+    .nbtn{flex:1;padding:9px 0 12px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;border:none;background:none;color:#BBB;transition:color .15s;font-family:'Noto Sans KR',sans-serif}
+    .nbtn.on{color:#2E7D8C}
+    .nbtn .ni{font-size:22px}
+    .nbtn .nl{font-size:11px;font-weight:600}
+
+    /* UTIL */
+    .hidden{display:none!important}
+    .no-result{text-align:center;padding:40px 20px;color:#AAA;font-size:14px}
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header class="hdr" id="hdr">
+    <button class="hdr-back hidden" id="btn-back" onclick="goBack()">‹</button>
+    <div>
+      <div class="hdr-title" id="hdr-title">🏥 케어브릿지</div>
+      <div class="hdr-sub" id="hdr-sub">암 요양병원 찾기</div>
+    </div>
+    <button class="hdr-fav-btn hidden" id="hdr-heart" onclick="toggleDetailFav()">🤍</button>
+  </header>
+
+  <!-- ── HOME ── -->
+  <section class="view active" id="vh">
+    <div class="logo-box">
+      <div class="logo-circle">🏥</div>
+      <div class="home-h">치료 받는 병원을<br>선택해 주세요</div>
+      <div class="home-p">대학병원 주변 암 요양 전문 병원을<br>거리순으로 안내해 드립니다</div>
+    </div>
+    <div class="sec-label">서울 5대 암센터</div>
+    <div id="uni-list"></div>
+  </section>
+
+  <!-- ── LIST ── -->
+  <section class="view" id="vl">
+    <div class="filter-wrap">
+      <div class="filter-bar">
+        <button class="fbtn" id="f-ins" onclick="toggleFilter('ins')">건강보험</button>
+        <button class="fbtn" id="f-prv" onclick="toggleFilter('prv')">1인실</button>
+        <button class="fbtn" id="f-chm" onclick="toggleFilter('chm')">항암 병행</button>
+        <button class="fbtn" id="f-rad" onclick="toggleFilter('rad')">방사선 병행</button>
+      </div>
+      <div class="sort-row">
+        <span class="sort-lbl">정렬</span>
+        <button class="sbtn on" id="s-dist" onclick="setSort('dist')">거리순</button>
+        <button class="sbtn" id="s-name" onclick="setSort('name')">이름순</button>
+      </div>
+    </div>
+    <div class="result-lbl" id="result-lbl"></div>
+    <div class="card-list" id="card-list"></div>
+  </section>
+
+  <!-- ── MAP ── -->
+  <section class="view" id="view-map">
+    <div id="kmap"></div>
+    <div class="map-panel" id="map-panel">
+      <div class="panel-handle"></div>
+      <div class="panel-name" id="panel-name"></div>
+      <div class="panel-addr" id="panel-addr"></div>
+      <div class="badges" id="panel-badges"></div>
+      <div class="panel-btns">
+        <button class="pbtn-detail" onclick="openDetailFromPanel()">상세 보기</button>
+        <button class="pbtn-call" onclick="callFromPanel()">📞 전화</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DETAIL ── -->
+  <section class="view" id="vd">
+    <div class="det-img" id="det-img">🏥</div>
+    <div class="det-body">
+      <div class="det-name" id="det-name"></div>
+      <div class="det-addr" id="det-addr">📍 <span id="det-addr-txt"></span></div>
+      <div class="det-badges" id="det-badges"></div>
+      <div class="det-sec">
+        <div class="det-sec-t">기본 정보</div>
+        <div class="det-row"><span class="det-row-l">전화번호</span><span class="det-row-v" id="det-phone"></span></div>
+        <div class="det-row"><span class="det-row-l">대학병원까지</span><span class="det-row-v" id="det-dist"></span></div>
+        <div class="det-row"><span class="det-row-l">건강보험</span><span class="det-row-v" id="det-ins"></span></div>
+        <div class="det-row"><span class="det-row-l">1인실</span><span class="det-row-v" id="det-prv"></span></div>
+        <div class="det-row"><span class="det-row-l">항암 병행 입원</span><span class="det-row-v" id="det-chm"></span></div>
+        <div class="det-row"><span class="det-row-l">방사선 병행 입원</span><span class="det-row-v" id="det-rad"></span></div>
+      </div>
+      <div class="det-sec">
+        <div class="det-sec-t">비용 안내 (참고)</div>
+        <div class="det-row"><span class="det-row-l">다인실 1일</span><span class="det-row-v" id="det-pw"></span></div>
+        <div class="det-row"><span class="det-row-l">1인실 1일</span><span class="det-row-v" id="det-pp"></span></div>
+      </div>
+      <div class="det-sec">
+        <div class="det-sec-t">주요 시설 및 특징</div>
+        <div class="det-features" id="det-feat"></div>
+      </div>
+      <div class="disclaimer">⚠️ 입원 가능 여부, 비용, 보험 적용 여부는 반드시 병원에 직접 확인하시기 바랍니다. 제공 정보는 변경될 수 있습니다.</div>
+    </div>
+    <div class="fixed-btns">
+      <button class="btn-call-big" id="det-call-btn">📞 전화 연결</button>
+      <button class="btn-heart-big" id="det-heart-btn" onclick="toggleDetailFav()">🤍</button>
+    </div>
+  </section>
+
+  <!-- ── FAVORITES ── -->
+  <section class="view" id="view-fav">
+    <div id="fav-list" style="display:flex;flex-direction:column;gap:9px;padding:10px 12px 16px"></div>
+  </section>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bnav" id="bnav">
+    <button class="nbtn on" id="nb-list" onclick="switchTab('list')">
+      <span class="ni">📋</span><span class="nl">리스트</span>
+    </button>
+    <button class="nbtn" id="nb-map" onclick="switchTab('map')">
+      <span class="ni">🗺</span><span class="nl">지도</span>
+    </button>
+    <button class="nbtn" id="nb-fav" onclick="switchTab('fav')">
+      <span class="ni">❤️</span><span class="nl">즐겨찾기</span>
+    </button>
+  </nav>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════
+const UNIS = [
+  { id:'snu',  name:'서울대학교병원',  area:'종로구 연건동',  lat:37.5796, lng:126.9990, icon:'🔵' },
+  { id:'sam',  name:'삼성서울병원',    area:'강남구 일원동',  lat:37.4884, lng:127.0857, icon:'🟢' },
+  { id:'asan', name:'서울아산병원',    area:'송파구 올림픽로',lat:37.5268, lng:127.1085, icon:'🟠' },
+  { id:'sev',  name:'세브란스병원',    area:'서대문구 성산로',lat:37.5624, lng:126.9407, icon:'🟣' },
+  { id:'smc',  name:'서울성모병원',    area:'서초구 반포대로',lat:37.5010, lng:127.0052, icon:'🔴' },
+];
+
+const HOSPITALS = [
+  // 서울대 권역
+  { id:1, uni:'snu', name:'연건요양병원', addr:'서울 종로구 대학로 101', phone:'02-741-1234',
+    lat:37.5820, lng:127.0020, km:0.4,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:65000, pp:120000, feat:'물리치료실, 영양사 식단 관리, 암 환자 전문 간호, 원목 정원, 보호자 샤워실', emoji:'🌿' },
+
+  { id:2, uni:'snu', name:'혜화재활요양병원', addr:'서울 종로구 혜화로 88', phone:'02-742-5678',
+    lat:37.5845, lng:126.9978, km:0.7,
+    ins:true, prv:true, chm:true, rad:false,
+    pw:58000, pp:110000, feat:'재활치료, 침 치료, 통증 클리닉, 24시간 간호사 상주', emoji:'🌸' },
+
+  { id:3, uni:'snu', name:'성북나눔병원', addr:'서울 성북구 보문로 210', phone:'02-913-2345',
+    lat:37.5922, lng:127.0187, km:2.1,
+    ins:true, prv:false, chm:true, rad:true,
+    pw:48000, pp:98000, feat:'암 환자 심리 상담, 음악 치료, 요리 치료, 가족 면담실', emoji:'🌻' },
+
+  { id:4, uni:'snu', name:'북한산요양병원', addr:'서울 강북구 삼양로 360', phone:'02-987-6543',
+    lat:37.6178, lng:127.0122, km:4.2,
+    ins:true, prv:true, chm:false, rad:false,
+    pw:45000, pp:90000, feat:'산림 치유 프로그램, 옥상 텃밭, 온천욕, 명상 센터', emoji:'🌲' },
+
+  // 삼성 권역
+  { id:5, uni:'sam', name:'강남암요양병원', addr:'서울 강남구 개포로 410', phone:'02-571-1234',
+    lat:37.4910, lng:127.0742, km:0.5,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:75000, pp:145000, feat:'항암 부작용 집중 케어, 영양수액 치료, VIP 1인실, 보호자 룸', emoji:'🌺' },
+
+  { id:6, uni:'sam', name:'일원사랑요양병원', addr:'서울 강남구 일원로 62', phone:'02-3410-8888',
+    lat:37.4852, lng:127.0899, km:0.8,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:70000, pp:135000, feat:'삼성서울병원 협력 기관, 셔틀 운행, 원내 카페테리아', emoji:'🏡' },
+
+  { id:7, uni:'sam', name:'수서요양원', addr:'서울 강남구 수서동 704', phone:'02-449-5500',
+    lat:37.4812, lng:127.1000, km:1.9,
+    ins:true, prv:false, chm:true, rad:false,
+    pw:52000, pp:105000, feat:'수치료 시설, 물리치료, 낮 병동 프로그램 운영', emoji:'💧' },
+
+  { id:8, uni:'sam', name:'송파힐링병원', addr:'서울 송파구 위례성대로 50', phone:'02-406-7890',
+    lat:37.4736, lng:127.1220, km:3.8,
+    ins:true, prv:true, chm:false, rad:true,
+    pw:60000, pp:115000, feat:'공원 인접, 원예 치료, 음식 치유 프로그램, 웃음 치료', emoji:'🌼' },
+
+  // 아산 권역
+  { id:9, uni:'asan', name:'올림픽요양병원', addr:'서울 송파구 올림픽로 260', phone:'02-410-2345',
+    lat:37.5220, lng:127.1140, km:0.6,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:68000, pp:128000, feat:'아산병원 셔틀 연계, 항암 전담 간호사, 24시간 응급 대응', emoji:'🏅' },
+
+  { id:10, uni:'asan', name:'풍납요양케어센터', addr:'서울 송파구 풍납동 389', phone:'02-478-3333',
+    lat:37.5343, lng:127.1178, km:1.2,
+    ins:true, prv:true, chm:true, rad:false,
+    pw:62000, pp:118000, feat:'강변 경관, 보행 재활, 작업 치료, 사회 복지사 상주', emoji:'🌊' },
+
+  { id:11, uni:'asan', name:'강동암전문요양병원', addr:'서울 강동구 천호대로 1027', phone:'02-489-6789',
+    lat:37.5480, lng:127.1380, km:2.3,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:58000, pp:108000, feat:'암 전문 영양사, 혈액종양 케어, 가족 교육 프로그램', emoji:'🔬' },
+
+  { id:12, uni:'asan', name:'하남행복요양병원', addr:'경기 하남시 미사강변대로 250', phone:'031-793-4444',
+    lat:37.5568, lng:127.2010, km:5.5,
+    ins:true, prv:false, chm:false, rad:false,
+    pw:42000, pp:85000, feat:'미사 강변 뷰, 산책로, 저렴한 비용, 넓은 공용 정원', emoji:'🌅' },
+
+  // 세브란스 권역
+  { id:13, uni:'sev', name:'신촌요양병원', addr:'서울 서대문구 신촌로 128', phone:'02-313-1111',
+    lat:37.5590, lng:126.9358, km:0.5,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:72000, pp:138000, feat:'세브란스 연계 진료, 지하 셔틀 정류장, 전문 영양사', emoji:'🍀' },
+
+  { id:14, uni:'sev', name:'마포힐링케어', addr:'서울 마포구 마포대로 120', phone:'02-719-2222',
+    lat:37.5488, lng:126.9516, km:2.0,
+    ins:true, prv:true, chm:true, rad:false,
+    pw:65000, pp:122000, feat:'한강 접근, 음악 치료실, 미술 치료, 족욕 치료', emoji:'🎵' },
+
+  { id:15, uni:'sev', name:'홍제중앙요양병원', addr:'서울 서대문구 홍제동 56', phone:'02-392-9900',
+    lat:37.5794, lng:126.9430, km:2.2,
+    ins:true, prv:false, chm:true, rad:true,
+    pw:50000, pp:98000, feat:'노인 요양 병동 분리 운영, 뇌졸중 재활, 통증 완화 클리닉', emoji:'🏠' },
+
+  { id:16, uni:'sev', name:'연희자연요양원', addr:'서울 서대문구 연희로 304', phone:'02-333-8877',
+    lat:37.5692, lng:126.9210, km:3.1,
+    ins:true, prv:true, chm:false, rad:false,
+    pw:55000, pp:108000, feat:'숲세권 위치, 자연 친화 환경, 원예 치료, 명상 치유', emoji:'🌿' },
+
+  // 성모 권역
+  { id:17, uni:'smc', name:'반포요양병원', addr:'서울 서초구 반포대로 179', phone:'02-591-7777',
+    lat:37.5040, lng:127.0000, km:0.4,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:73000, pp:140000, feat:'성모병원 5분 거리, 셔틀 운행, 항암 전담 팀, 채플', emoji:'✝️' },
+
+  { id:18, uni:'smc', name:'서초암케어병원', addr:'서울 서초구 서초중앙로 72', phone:'02-588-4444',
+    lat:37.4978, lng:126.9908, km:1.3,
+    ins:true, prv:true, chm:true, rad:true,
+    pw:67000, pp:125000, feat:'암 전문 완화 치료, 호스피스 병동 별도, 법적·심리 상담 지원', emoji:'🕊️' },
+
+  { id:19, uni:'smc', name:'동작나눔요양병원', addr:'서울 동작구 상도로 155', phone:'02-816-5555',
+    lat:37.5060, lng:126.9558, km:3.4,
+    ins:true, prv:false, chm:true, rad:false,
+    pw:48000, pp:95000, feat:'지하철 인근, 경제적 비용, 봉사자 방문 프로그램, 종교 예배', emoji:'🙏' },
+
+  { id:20, uni:'smc', name:'방배힐요양병원', addr:'서울 서초구 방배동 833', phone:'02-522-1234',
+    lat:37.4850, lng:126.9820, km:4.1,
+    ins:true, prv:true, chm:false, rad:true,
+    pw:58000, pp:112000, feat:'조용한 주택가, 요리 치료, 운동 치료, 가족 대기실 완비', emoji:'🌙' },
+];
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let state = {
+  uni: null,           // selected university id
+  filters: { ins:false, prv:false, chm:false, rad:false },
+  sort: 'dist',
+  currentHospital: null,
+  prevView: null,
+  favs: JSON.parse(localStorage.getItem('cb_favs') || '[]'),
+  mapInited: false,
+  kakaoMap: null,
+  kakaoMarkers: [],
+  panelHospital: null,
+};
+
+function saveFavs() {
+  localStorage.setItem('cb_favs', JSON.stringify(state.favs));
+}
+function isFav(id) { return state.favs.includes(id); }
+
+// ═══════════════════════════════════════
+//  NAVIGATION
+// ═══════════════════════════════════════
+let currentView = 'home'; // home | list | map | detail | fav
+
+function showView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  const map = { home:'vh', list:'vl', map:'view-map', detail:'vd', fav:'view-fav' };
+  document.getElementById(map[v]).classList.add('active');
+
+  const bnav = document.getElementById('bnav');
+  const backBtn = document.getElementById('btn-back');
+  const heartBtn = document.getElementById('hdr-heart');
+
+  // header
+  const titles = {
+    home: ['🏥 케어브릿지', '암 요양병원 찾기'],
+    list: [state.uni ? getUni(state.uni).name + ' 주변' : '요양병원 목록', '가까운 암 요양병원'],
+    map:  [state.uni ? getUni(state.uni).name + ' 주변' : '지도', '지도로 보기'],
+    detail: [state.currentHospital ? state.currentHospital.name : '', '병원 상세'],
+    fav:  ['즐겨찾기', '저장한 병원'],
+  };
+  document.getElementById('hdr-title').textContent = titles[v][0];
+  document.getElementById('hdr-sub').textContent   = titles[v][1];
+
+  backBtn.classList.toggle('hidden', v === 'home' || v === 'list' || v === 'map' || v === 'fav');
+  heartBtn.classList.toggle('hidden', v !== 'detail');
+  bnav.classList.toggle('hidden', v === 'home' || v === 'detail');
+
+  // bottom nav active state
+  ['list','map','fav'].forEach(t => {
+    document.getElementById('nb-' + t).classList.toggle('on', v === t);
+  });
+
+  if (v === 'map') initMapIfNeeded();
+  if (v === 'fav') renderFavs();
+
+  currentView = v;
+}
+
+function switchTab(tab) {
+  if (!state.uni && tab !== 'fav') return;
+  showView(tab);
+  if (tab === 'list') renderList();
+  if (tab === 'map')  renderMarkers();
+}
+
+function goBack() {
+  if (currentView === 'detail') {
+    showView(state.prevView || 'list');
+    if (state.prevView === 'list') renderList();
+  }
+}
+
+function getUni(id) { return UNIS.find(u => u.id === id); }
+
+// ═══════════════════════════════════════
+//  HOME
+// ═══════════════════════════════════════
+function renderHome() {
+  const el = document.getElementById('uni-list');
+  el.innerHTML = UNIS.map(u => `
+    <button class="uni-btn" onclick="selectUni('${u.id}')">
+      <div class="uni-icon">${u.icon}</div>
+      <div class="uni-info"><h3>${u.name}</h3><p>${u.area}</p></div>
+      <span class="uni-arrow">›</span>
+    </button>
+  `).join('');
+}
+
+function selectUni(id) {
+  state.uni = id;
+  state.mapInited = false;
+  showView('list');
+  renderList();
+}
+
+// ═══════════════════════════════════════
+//  LIST
+// ═══════════════════════════════════════
+function getFiltered() {
+  let list = HOSPITALS.filter(h => h.uni === state.uni);
+  const f = state.filters;
+  if (f.ins) list = list.filter(h => h.ins);
+  if (f.prv) list = list.filter(h => h.prv);
+  if (f.chm) list = list.filter(h => h.chm);
+  if (f.rad) list = list.filter(h => h.rad);
+  if (state.sort === 'dist') list.sort((a,b) => a.km - b.km);
+  if (state.sort === 'name') list.sort((a,b) => a.name.localeCompare(b.name));
+  return list;
+}
+
+function toggleFilter(key) {
+  state.filters[key] = !state.filters[key];
+  document.getElementById('f-'+key).classList.toggle('on', state.filters[key]);
+  renderList();
+  if (currentView === 'map') renderMarkers();
+}
+
+function setSort(s) {
+  state.sort = s;
+  ['dist','name'].forEach(k => document.getElementById('s-'+k).classList.toggle('on', state.sort === k));
+  renderList();
+}
+
+function renderList() {
+  const list = getFiltered();
+  const lbl = document.getElementById('result-lbl');
+  lbl.innerHTML = `총 <strong>${list.length}개</strong> 병원`;
+  const el = document.getElementById('card-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="no-result">조건에 맞는 병원이 없습니다.<br>필터를 변경해 주세요.</div>';
+    return;
+  }
+  el.innerHTML = list.map(h => cardHTML(h)).join('');
+}
+
+function cardHTML(h) {
+  const fav = isFav(h.id) ? '❤️' : '🤍';
+  const badges = badgesHTML(h);
+  const priceStr = h.pw ? `다인실 <span>${h.pw.toLocaleString()}원</span>/일` : '';
+  return `
+    <div class="card" onclick="openDetail(${h.id}, 'list')">
+      <div class="card-top">
+        <div class="card-name">${h.emoji} ${h.name}</div>
+        <div class="card-km">${h.km}km</div>
+      </div>
+      <div class="card-addr">📍 ${h.addr}</div>
+      <div class="badges">${badges}</div>
+      <div class="card-bottom">
+        <div class="card-price">${priceStr}</div>
+        <button class="card-heart" onclick="event.stopPropagation();quickFav(${h.id})">${fav}</button>
+      </div>
+    </div>`;
+}
+
+function badgesHTML(h) {
+  let b = '';
+  if (h.ins) b += '<span class="badge b-ins">건강보험</span>';
+  if (h.prv) b += '<span class="badge b-prv">1인실</span>';
+  if (h.chm) b += '<span class="badge b-chm">항암병행</span>';
+  if (h.rad) b += '<span class="badge b-rad">방사선병행</span>';
+  return b;
+}
+
+function quickFav(id) {
+  if (isFav(id)) state.favs = state.favs.filter(x => x !== id);
+  else state.favs.push(id);
+  saveFavs();
+  renderList();
+}
+
+// ═══════════════════════════════════════
+//  MAP
+// ═══════════════════════════════════════
+function initMapIfNeeded() {
+  if (state.mapInited) return;
+  const uni = getUni(state.uni);
+  if (!uni) return;
+
+  setTimeout(() => {
+    try {
+      const container = document.getElementById('kmap');
+      const options = { center: new kakao.maps.LatLng(uni.lat, uni.lng), level: 5 };
+      state.kakaoMap = new kakao.maps.Map(container, options);
+
+      // 대학병원 마커
+      new kakao.maps.Marker({
+        map: state.kakaoMap,
+        position: new kakao.maps.LatLng(uni.lat, uni.lng),
+        title: uni.name,
+        image: new kakao.maps.MarkerImage(
+          'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+          new kakao.maps.Size(24, 35)
+        )
+      });
+
+      state.mapInited = true;
+      renderMarkers();
+    } catch(e) { console.warn('Kakao Map 초기화 실패:', e); }
+  }, 80);
+}
+
+function renderMarkers() {
+  if (!state.kakaoMap) return;
+  state.kakaoMarkers.forEach(m => m.setMap(null));
+  state.kakaoMarkers = [];
+
+  getFiltered().forEach(h => {
+    const pos = new kakao.maps.LatLng(h.lat, h.lng);
+    const marker = new kakao.maps.Marker({ map: state.kakaoMap, position: pos, title: h.name });
+    kakao.maps.event.addListener(marker, 'click', () => openMapPanel(h));
+    state.kakaoMarkers.push(marker);
+  });
+}
+
+function openMapPanel(h) {
+  state.panelHospital = h;
+  document.getElementById('panel-name').textContent  = h.emoji + ' ' + h.name;
+  document.getElementById('panel-addr').textContent  = h.addr;
+  document.getElementById('panel-badges').innerHTML  = badgesHTML(h);
+  document.getElementById('map-panel').classList.add('show');
+}
+
+document.getElementById('map-panel').addEventListener('click', function(e) {
+  if (e.target === this || e.target.classList.contains('panel-handle'))
+    this.classList.remove('show');
+});
+
+function openDetailFromPanel() {
+  if (state.panelHospital) openDetail(state.panelHospital.id, 'map');
+}
+
+function callFromPanel() {
+  if (state.panelHospital) window.location.href = 'tel:' + state.panelHospital.phone;
+}
+
+// ═══════════════════════════════════════
+//  DETAIL
+// ═══════════════════════════════════════
+function openDetail(id, from) {
+  const h = HOSPITALS.find(x => x.id === id);
+  if (!h) return;
+  state.currentHospital = h;
+  state.prevView = from;
+
+  document.getElementById('det-img').textContent    = h.emoji;
+  document.getElementById('det-name').textContent   = h.name;
+  document.getElementById('det-addr-txt').textContent = h.addr;
+  document.getElementById('det-badges').innerHTML   = badgesHTML(h);
+  document.getElementById('det-phone').textContent  = h.phone;
+  document.getElementById('det-dist').textContent   = h.km + 'km';
+  document.getElementById('det-ins').textContent    = h.ins ? '✅ 적용' : '❌ 비적용';
+  document.getElementById('det-prv').textContent    = h.prv ? '✅ 있음' : '❌ 없음';
+  document.getElementById('det-chm').textContent    = h.chm ? '✅ 가능' : '❌ 불가';
+  document.getElementById('det-rad').textContent    = h.rad ? '✅ 가능' : '❌ 불가';
+  document.getElementById('det-pw').textContent     = h.pw  ? h.pw.toLocaleString() + '원' : '문의';
+  document.getElementById('det-pp').textContent     = h.pp  ? h.pp.toLocaleString() + '원' : '문의';
+  document.getElementById('det-feat').textContent   = h.feat;
+  document.getElementById('det-call-btn').onclick   = () => window.location.href = 'tel:' + h.phone;
+
+  updateDetailHeart();
+  showView('detail');
+}
+
+function updateDetailHeart() {
+  const id = state.currentHospital && state.currentHospital.id;
+  const hBig = document.getElementById('det-heart-btn');
+  const hHdr = document.getElementById('hdr-heart');
+  const v = isFav(id) ? '❤️' : '🤍';
+  if (hBig) hBig.textContent = v;
+  if (hHdr) hHdr.textContent = v;
+}
+
+function toggleDetailFav() {
+  const id = state.currentHospital && state.currentHospital.id;
+  if (!id) return;
+  if (isFav(id)) state.favs = state.favs.filter(x => x !== id);
+  else state.favs.push(id);
+  saveFavs();
+  updateDetailHeart();
+}
+
+// ═══════════════════════════════════════
+//  FAVORITES
+// ═══════════════════════════════════════
+function renderFavs() {
+  const el = document.getElementById('fav-list');
+  const list = HOSPITALS.filter(h => isFav(h.id));
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><div class="ei">🤍</div><p>저장한 병원이 없습니다.<br>병원 카드의 하트를 눌러 저장해 보세요</p></div>';
+    return;
+  }
+  el.innerHTML = list.map(h => `
+    <div class="card" onclick="openDetail(${h.id}, 'fav')">
+      <div class="card-top">
+        <div class="card-name">${h.emoji} ${h.name}</div>
+        <div class="card-km">${h.km}km</div>
+      </div>
+      <div class="card-addr">📍 ${h.addr}</div>
+      <div class="badges">${badgesHTML(h)}</div>
+      <div class="card-bottom">
+        <div class="card-price">${h.pw ? '다인실 <span>' + h.pw.toLocaleString() + '원</span>/일' : ''}</div>
+        <button class="card-heart" onclick="event.stopPropagation();removeFav(${h.id})">❤️</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function removeFav(id) {
+  state.favs = state.favs.filter(x => x !== id);
+  saveFavs();
+  renderFavs();
+}
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+renderHome();
+</script>
+</body>
+</html>
