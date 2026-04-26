@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <title>케어브릿지 — 암 요양병원 찾기</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
-  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=608484a4f5536ddf83031123c853b135"></script>
+  <script src="//dapi.kakao.com/v2/maps/sdk.js?appkey=608484a4f5536ddf83031123c853b135&libraries=services"></script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
     html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:#F0F4F8;color:#1A2B3C;overflow:hidden}
@@ -125,8 +125,8 @@
   <!-- LOADING OVERLAY -->
   <div id="loading-overlay" style="display:none;position:absolute;inset:0;background:rgba(46,125,140,.96);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;text-align:center">
     <div style="font-size:48px">🏥</div>
-    <div style="font-size:17px;font-weight:700">병원 정보 불러오는 중...</div>
-    <div style="font-size:13px;opacity:.75">구글 시트에서 최신 데이터를 가져옵니다</div>
+    <div style="font-size:17px;font-weight:700" id="loading-title">병원 정보 불러오는 중...</div>
+    <div style="font-size:13px;opacity:.75" id="loading-sub">구글 시트에서 최신 데이터를 가져옵니다</div>
   </div>
 
   <!-- HEADER -->
@@ -386,7 +386,7 @@ function saveFavs() {
 function isFav(id) { return state.favs.includes(id); }
 
 // ═══════════════════════════════════════
-//  구글 시트 CSV 로더
+//  구글 시트 CSV 로더 + 자동 좌표 변환
 // ═══════════════════════════════════════
 function parseCSVLine(line) {
   const result = [];
@@ -401,33 +401,91 @@ function parseCSVLine(line) {
   return result;
 }
 
+// 두 좌표 사이 거리 (km)
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * 10) / 10;
+}
+
+// 주소 → 좌표 (카카오 지오코더, 캐시 적용)
+function geocodeAddr(addr) {
+  const cache = JSON.parse(localStorage.getItem('cb_geo') || '{}');
+  if (cache[addr]) return Promise.resolve(cache[addr]);
+  return new Promise((resolve) => {
+    try {
+      const gc = new kakao.maps.services.Geocoder();
+      gc.addressSearch(addr, (result, status) => {
+        if (status === kakao.maps.services.Status.OK) {
+          const coords = { lat: +result[0].y, lng: +result[0].x };
+          cache[addr] = coords;
+          localStorage.setItem('cb_geo', JSON.stringify(cache));
+          resolve(coords);
+        } else {
+          resolve(null);
+        }
+      });
+    } catch(e) { resolve(null); }
+  });
+}
+
+function setLoading(title, sub) {
+  const t = document.getElementById('loading-title');
+  const s = document.getElementById('loading-sub');
+  if (t) t.textContent = title;
+  if (s) s.textContent = sub || '';
+}
+
 async function loadSheetData() {
   if (!SHEET_CSV_URL) return;
   const overlay = document.getElementById('loading-overlay');
   overlay.style.display = 'flex';
   try {
+    // 1단계: 시트에서 CSV 다운로드
+    setLoading('병원 정보 불러오는 중...', '구글 시트에서 데이터를 가져옵니다');
     const res  = await fetch(SHEET_CSV_URL);
     const text = await res.text();
     const rows = text.trim().split(/\r?\n/).slice(1);
+
     HOSPITALS.length = 0;
     rows.forEach((line, i) => {
       const c = parseCSVLine(line);
-      if (c.length < 14 || !c[2]) return;
+      // 컬럼: uni, name, addr, phone, ins, prv, chm, rad, pw, pp, feat, emoji
+      if (c.length < 8 || !c[1]) return;
       HOSPITALS.push({
         id:    i + 1,
-        uni:   c[0],  name:  c[1],  addr:  c[2], phone: c[3],
-        lat:   +c[4], lng:   +c[5], km:    +c[6],
-        ins:   c[7].toUpperCase()  === 'Y',
-        prv:   c[8].toUpperCase()  === 'Y',
-        chm:   c[9].toUpperCase()  === 'Y',
-        rad:   c[10].toUpperCase() === 'Y',
-        pw:    +c[11] || 0,
-        pp:    +c[12] || 0,
-        feat:  c[13] || '',
-        emoji: c[14]  || '🏥',
+        uni:   c[0], name:  c[1], addr: c[2], phone: c[3],
+        lat:   0,    lng:   0,    km:   0,
+        ins:   (c[4] || '').toUpperCase() === 'Y',
+        prv:   (c[5] || '').toUpperCase() === 'Y',
+        chm:   (c[6] || '').toUpperCase() === 'Y',
+        rad:   (c[7] || '').toUpperCase() === 'Y',
+        pw:    +c[8]  || 0,
+        pp:    +c[9]  || 0,
+        feat:  c[10]  || '',
+        emoji: c[11]  || '🏥',
       });
     });
-    console.log('✅ 시트에서 병원 ' + HOSPITALS.length + '개 로드 완료');
+
+    // 2단계: 주소 → 좌표 자동 변환
+    let done = 0;
+    for (const h of HOSPITALS) {
+      done++;
+      setLoading(
+        `📍 주소 → 좌표 변환 중 (${done}/${HOSPITALS.length})`,
+        h.name + ' 위치 확인 중...'
+      );
+      const coords = await geocodeAddr(h.addr);
+      if (coords) {
+        h.lat = coords.lat;
+        h.lng = coords.lng;
+        const uni = UNIS.find(u => u.id === h.uni);
+        if (uni) h.km = haversineKm(uni.lat, uni.lng, h.lat, h.lng);
+      }
+      await new Promise(r => setTimeout(r, 80)); // API 속도 제한 방지
+    }
+    console.log('✅ 시트에서 병원 ' + HOSPITALS.length + '개 로드 + 좌표 변환 완료');
   } catch(e) {
     console.warn('시트 연동 실패, 기본 샘플 데이터 사용:', e);
   } finally {
