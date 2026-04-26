@@ -122,6 +122,13 @@
 <body>
 <div id="app">
 
+  <!-- LOADING OVERLAY -->
+  <div id="loading-overlay" style="display:none;position:absolute;inset:0;background:rgba(46,125,140,.96);z-index:999;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;text-align:center">
+    <div style="font-size:48px">🏥</div>
+    <div style="font-size:17px;font-weight:700">병원 정보 불러오는 중...</div>
+    <div style="font-size:13px;opacity:.75">구글 시트에서 최신 데이터를 가져옵니다</div>
+  </div>
+
   <!-- HEADER -->
   <header class="hdr" id="hdr">
     <button class="hdr-back hidden" id="btn-back" onclick="goBack()">‹</button>
@@ -231,6 +238,14 @@
 </div>
 
 <script>
+// ═══════════════════════════════════════
+//  구글 시트 연동 설정
+//  1) 구글 시트 상단 메뉴 → 파일 → 웹에 게시 → CSV → URL 복사
+//  2) 아래 '' 안에 붙여넣기 후 저장 & 배포
+//  3) 이후로는 시트만 수정하면 앱 자동 업데이트 (배포 불필요)
+// ═══════════════════════════════════════
+const SHEET_CSV_URL = '';
+
 // ═══════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════
@@ -369,6 +384,56 @@ function saveFavs() {
   localStorage.setItem('cb_favs', JSON.stringify(state.favs));
 }
 function isFav(id) { return state.favs.includes(id); }
+
+// ═══════════════════════════════════════
+//  구글 시트 CSV 로더
+// ═══════════════════════════════════════
+function parseCSVLine(line) {
+  const result = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+async function loadSheetData() {
+  if (!SHEET_CSV_URL) return;
+  const overlay = document.getElementById('loading-overlay');
+  overlay.style.display = 'flex';
+  try {
+    const res  = await fetch(SHEET_CSV_URL);
+    const text = await res.text();
+    const rows = text.trim().split(/\r?\n/).slice(1);
+    HOSPITALS.length = 0;
+    rows.forEach((line, i) => {
+      const c = parseCSVLine(line);
+      if (c.length < 14 || !c[2]) return;
+      HOSPITALS.push({
+        id:    i + 1,
+        uni:   c[0],  name:  c[1],  addr:  c[2], phone: c[3],
+        lat:   +c[4], lng:   +c[5], km:    +c[6],
+        ins:   c[7].toUpperCase()  === 'Y',
+        prv:   c[8].toUpperCase()  === 'Y',
+        chm:   c[9].toUpperCase()  === 'Y',
+        rad:   c[10].toUpperCase() === 'Y',
+        pw:    +c[11] || 0,
+        pp:    +c[12] || 0,
+        feat:  c[13] || '',
+        emoji: c[14]  || '🏥',
+      });
+    });
+    console.log('✅ 시트에서 병원 ' + HOSPITALS.length + '개 로드 완료');
+  } catch(e) {
+    console.warn('시트 연동 실패, 기본 샘플 데이터 사용:', e);
+  } finally {
+    overlay.style.display = 'none';
+  }
+}
 
 // ═══════════════════════════════════════
 //  NAVIGATION
@@ -668,16 +733,18 @@ function removeFav(id) {
 // ═══════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════
-renderHome();
-history.replaceState({ view: 'home' }, '');
-
-window.addEventListener('popstate', function(e) {
-  const v = (e.state && e.state.view) || 'home';
-  _skipHistory = true;
-  showView(v);
-  if (v === 'list') renderList();
-  if (v === 'map')  renderMarkers();
-});
+(async () => {
+  await loadSheetData();
+  renderHome();
+  history.replaceState({ view: 'home' }, '');
+  window.addEventListener('popstate', function(e) {
+    const v = (e.state && e.state.view) || 'home';
+    _skipHistory = true;
+    showView(v);
+    if (v === 'list') renderList();
+    if (v === 'map')  renderMarkers();
+  });
+})();
 </script>
 </body>
 </html>
