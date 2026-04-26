@@ -374,6 +374,7 @@ function isFav(id) { return state.favs.includes(id); }
 //  NAVIGATION
 // ═══════════════════════════════════════
 let currentView = 'home'; // home | list | map | detail | fav
+let _skipHistory = false;
 
 function showView(v) {
   document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
@@ -395,7 +396,7 @@ function showView(v) {
   document.getElementById('hdr-title').textContent = titles[v][0];
   document.getElementById('hdr-sub').textContent   = titles[v][1];
 
-  backBtn.classList.toggle('hidden', v === 'home' || v === 'list' || v === 'map' || v === 'fav');
+  backBtn.classList.toggle('hidden', v === 'home' || v === 'fav');
   heartBtn.classList.toggle('hidden', v !== 'detail');
   bnav.classList.toggle('hidden', v === 'home' || v === 'detail');
 
@@ -407,6 +408,8 @@ function showView(v) {
   if (v === 'map') initMapIfNeeded();
   if (v === 'fav') renderFavs();
 
+  if (!_skipHistory) history.pushState({ view: v }, '');
+  _skipHistory = false;
   currentView = v;
 }
 
@@ -418,10 +421,7 @@ function switchTab(tab) {
 }
 
 function goBack() {
-  if (currentView === 'detail') {
-    showView(state.prevView || 'list');
-    if (state.prevView === 'list') renderList();
-  }
+  history.back();
 }
 
 function getUni(id) { return UNIS.find(u => u.id === id); }
@@ -669,6 +669,15 @@ function removeFav(id) {
 //  INIT
 // ═══════════════════════════════════════
 renderHome();
+history.replaceState({ view: 'home' }, '');
+
+window.addEventListener('popstate', function(e) {
+  const v = (e.state && e.state.view) || 'home';
+  _skipHistory = true;
+  showView(v);
+  if (v === 'list') renderList();
+  if (v === 'map')  renderMarkers();
+});
 </script>
 </body>
 </html>
